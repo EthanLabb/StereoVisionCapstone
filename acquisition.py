@@ -1,82 +1,66 @@
 from picamera2 import Picamera2
+from picamera2.encoders import H264Encoder
+from libcamera import controls
 import time
 
+class StereoCameraAcquisition:
+    def __init__(self, left_camera_id=0, right_camera_id=1, frame_rate=30):
+        self.left_camera = Picamera2(camera_num=left_camera_id)
+        self.right_camera = Picamera2(camera_num=right_camera_id)
+        
+        self.framerate = frame_rate
+        self.ctrls = {"FrameRate": self.framerate, 'SyncMode': controls.rpi.syncModeEnum.Server}
 
-def list_cameras():
-    cams = Picamera2.global_camera_info()
-    print("\nDetected cameras:")
-    for cam in cams:
-        print(f" - ID: {cam['Id']} | Model: {cam['Model']}")
-    print()
-    return cams
+        self.left_config_still = self.left_camera.create_still_configuration(main={"size": (1920, 1080)}, controls=self.ctrls)
+        self.right_config_still = self.right_camera.create_still_configuration(main={"size": (1920, 1080)}, controls=self.ctrls)
+        
+        self.left_config_video = self.left_camera.create_video_configuration(main={"size": (1920, 1080)}, controls=self.ctrls)
+        self.right_config_video = self.right_camera.create_video_configuration(main={"size": (1920, 1080)}, controls=self.ctrls)
+        
+        self.encoder = H264Encoder(bitrate=1000000)
+        self.encoder.sync_enable = True
 
+    def configure_cameras(self):
+        self.left_camera.configure(self.left_config_still)
+        self.right_camera.configure(self.right_config_still)
+        
+    def start(self):
+        self.left_camera.start(self.left_config_still)
+        self.right_camera.start(self.right_config_still)
+        time.sleep(2)  # Allow cameras to warm up
+        
+    def initialize_cameras(self):
+        self.left_camera.stop()
+        self.right_camera.stop()
+        self.configure_cameras()
+        self.start()
 
-def capture_single_image(filename="image.jpg"):
-    picam2 = Picamera2()
-    config = picam2.create_still_configuration()
-    picam2.configure(config)
-    picam2.start()
-    time.sleep(2)
-    picam2.capture_file(filename)
-    print(f"[Default Camera] Saved {filename}\n")
-
-
-def capture_from_camera(camera_id, filename="image.jpg"):
-    picam2 = Picamera2(camera_num=camera_id)
-    config = picam2.create_still_configuration()
-    picam2.configure(config)
-    picam2.start()
-    time.sleep(2)
-    picam2.capture_file(filename)
-    print(f"[Camera {camera_id}] Saved {filename}\n")
-
-
-def capture_from_all():
-    cams = Picamera2.global_camera_info()
-    for cam in cams:
-        cid = cam["Id"]
-        filename = f"cam{cid}.jpg"
-        capture_from_camera(cid, filename)
-
-
-def main():
-    while True:
-        print("================================")
-        print(" Raspberry Pi Camera Controller ")
-        print("================================")
-        print("1. List cameras")
-        print("2. Capture image (default camera)")
-        print("3. Capture image from specific camera")
-        print("4. Capture one image from every camera")
-        print("5. Exit\n")
-
-        choice = input("Select an option: ")
-
-        if choice == "1":
-            list_cameras()
-
-        elif choice == "2":
-            filename = input(
-                "Output filename (default: default.jpg): ") or "default.jpg"
-            capture_single_image(filename)
-
-        elif choice == "3":
-            cams = list_cameras()
-            cam_id = int(input("Enter camera ID: "))
-            filename = input(
-                "Output filename (default: output.jpg): ") or "output.jpg"
-            capture_from_camera(cam_id, filename)
-
-        elif choice == "4":
-            capture_from_all()
-
-        elif choice == "5":
-            print("Exiting.")
-            break
-
-        else:
-            print("Invalid option.\n")
+    def capture_stereo_image(self, left_filename="left_image.jpg", right_filename="right_image.jpg"):
+        reqL = self.left_camera.capture_sync_request()
+        reqR = self.right_camera.capture_sync_request()
+        return reqL, reqR
+        print(f"Captured stereo images: {left_filename}, {right_filename}")
+        
+    def capture_video(self, left_filename="left_video.h264", right_filename="right_video.h264", duration=10):
+        self.left_camera.start_recording(self.encoder, left_filename)
+        self.right_camera.start_recording(self.encoder, right_filename)
+        self.encoder.sync.wait()
+        time.sleep(duration)
+        self.left_camera.stop_recording()
+        self.right_camera.stop_recording()
+        print(f"Captured stereo videos: {left_filename}, {right_filename}")
+        
+    def display_preview(self):
+        self.left_camera.start_preview()
+        self.right_camera.start_preview()
+        
+    def stop_preview(self):
+        self.left_camera.stop_preview()
+        self.right_camera.stop_preview()
+        
+    def stop(self):
+        self.left_camera.stop()
+        self.right_camera.stop()
 
 
-if __name__ == "__main__":
-    main()
+
