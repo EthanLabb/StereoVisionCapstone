@@ -194,8 +194,8 @@ class ImageClient:
         try:    
             if self.save_images:
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                left_filename = f"received_left_{timestamp}.jpg"
-                right_filename = f"received_right_{timestamp}.jpg"
+                left_filename = f"left_{timestamp}.jpg"
+                right_filename = f"right_{timestamp}.jpg"
                 with open(left_filename, 'wb') as fL:
                     fL.write(left_image_bytes)
                 with open(right_filename, 'wb') as fR:

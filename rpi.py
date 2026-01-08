@@ -27,7 +27,7 @@ class RaspberryPiStereoSystem:
 
         while self.running:
             # interface with UI to take images when button pressed
-            if input("Press Enter to capture images (or type 'exit' to quit): ") != 'exit':
+            if ui_button_pressed():
                 self.stereo_system.stop_preview()
                 imgL, imgR = self.stereo_system.capture_stereo_image()
 
