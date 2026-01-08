@@ -38,8 +38,8 @@ class StereoCameraAcquisition:
     def capture_stereo_image(self, left_filename="left_image.jpg", right_filename="right_image.jpg"):
         reqL = self.left_camera.capture_sync_request()
         reqR = self.right_camera.capture_sync_request()
-        return reqL, reqR
         print(f"Captured stereo images: {left_filename}, {right_filename}")
+        return reqL, reqR
         
     def capture_video(self, left_filename="left_video.h264", right_filename="right_video.h264", duration=10):
         self.left_camera.start_recording(self.encoder, left_filename)
@@ -61,6 +61,25 @@ class StereoCameraAcquisition:
     def stop(self):
         self.left_camera.stop()
         self.right_camera.stop()
+        
+    
 
+
+if __name__ == "__main__":
+    stereo_system = StereoCameraAcquisition()
+    running = True
+    stereo_system.initialize_cameras()
+    while running:
+        stereo_system.display_preview()
+        response = input("Press Enter to capture images, 'v' for video, or 'exit' to quit: ")
+        if response == 'exit':
+            running = False
+        elif response == 'v':
+            stereo_system.stop_preview()
+            stereo_system.capture_video()
+        else:
+            stereo_system.stop_preview()
+            stereo_system.capture_stereo_image()
+            stereo_system.stop()
 
 
