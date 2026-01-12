@@ -152,6 +152,7 @@ class ImageClient:
         self.server_host = server_host
         self.server_port = server_port
         self.save_images = save_images
+        self.connected = False
         
     def _recv_all(self, n):
         data = bytearray()
@@ -162,9 +163,10 @@ class ImageClient:
             data.extend(packet)
         return bytes(data)
 
-    def connect_to_server(self):
+    def connect(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.server_host, self.server_port))
+        self.connected = True
         print(f"Connected to server {self.server_host}:{self.server_port}")
     
     #receive 2 images
@@ -210,14 +212,16 @@ class ImageClient:
         try:
             if self.sock:
                 self.sock.close()
+                self.connected = False
         except Exception:
+            self.connected = False
             pass
         
 if __name__ == "__main__":
     user_input = input("Start as server (s) or client (c)? ")
     if user_input.lower() == 'c':
         client = ImageClient()
-        client.connect_to_server()
+        client.connect()
         try:
             while True:
                 imgL, imgR = client.receive_images()
