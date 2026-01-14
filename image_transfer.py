@@ -241,9 +241,9 @@ if __name__ == "__main__":
                         #load files from popup dialog to send
                         left_image = None
                         right_image = None
-                        with open("C:\\Users\\Ethan\\OneDrive\\Desktop\\Labs\\5th year\\Capstone\\StereoVisionCapstone\\left_image.jpg", 'rb') as fL:
+                        with open("C:\\Users\\15877\\OneDrive\\Documents\\GitHub\\StereoVisionCapstone\\LeftCBoard.png", 'rb') as fL:
                             left_image = fL.read()
-                        with open("C:\\Users\\Ethan\\OneDrive\\Desktop\\Labs\\5th year\\Capstone\\StereoVisionCapstone\\right_image.jpg", 'rb') as fR:
+                        with open("C:\\Users\\15877\\OneDrive\\Documents\\GitHub\\StereoVisionCapstone\\RightCBoard.png", 'rb') as fR:
                             right_image = fR.read()
                         try:
                             server.send_images(left_image, right_image)

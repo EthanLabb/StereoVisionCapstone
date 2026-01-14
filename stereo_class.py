@@ -44,6 +44,11 @@ class CameraCalibration:
         self.right_map1 = None
         self.right_map2 = None
 
+    def decode_img(self, img_left, img_right):
+        img_left_cv = cv2.imdecode(img_left, cv2.IMREAD_COLOR)
+        img_right_cv = cv2.imdecode(img_right, cv2.IMREAD_COLOR)
+        return img_left_cv, img_right_cv
+
     def add_chessboard_corners(self, img_left, img_right, display=False):
         """
         Detect and store chessboard corners in left and right images.
@@ -166,14 +171,14 @@ class StereoSystem:
             #Consider MODE_SGBM for less memory consumption
             mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY
         )
-        self.matcher_right = cv2.ximgproc.createRightMatcher(self.matcher_left)
+        #self.matcher_right = cv2.ximgproc.createRightMatcher(self.matcher_left)
 
         #LRCThresh default is 24 (1.5 px)
         #Can use .getConfidenceMap() ***Still need to find a way to calculate LRC consistency check median value in px
         #Lambda and SigmaColor values per documentation recommendation
-        self.wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=self.matcher_left)
+        """self.wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=self.matcher_left)
         self.wls_filter.setLambda(lambda_val)
-        self.wls_filter.setSigmaColor(sigma_color)
+        self.wls_filter.setSigmaColor(sigma_color)"""
 
         self.left_map1 = None
         self.left_map2 = None
@@ -196,8 +201,8 @@ class StereoSystem:
 
         dispR = self.matcher_right.compute(imgR, imgL).astype(np.float32) / 16.0
 
-        dispL_filtered = self.wls_filter.filter(dispL, imgL, None, dispR)
-        return dispL_filtered, dispL, dispR
+        #dispL_filtered = self.wls_filter.filter(dispL, imgL, None, dispR)
+        return "dispL_filtered", dispL, dispR
 
     def disparity_to_depth(self, disparity):
         if self.Q is None:
