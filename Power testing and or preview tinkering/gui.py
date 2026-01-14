@@ -1,41 +1,47 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         buttonheight=120
+        buttonwidth=480
 
         self.setWindowTitle("Stereo Vision Capstone")
+        self.setGeometry(100, 100, 600, 400)
+
+       
+        
+        #widgets initalize
+        button1 = QPushButton(text="1",parent=self)
+        button1.clicked.connect(self.button1click)
+
+        button2 = QPushButton(text="2",parent=self)
+        button2.clicked.connect(self.button2click)
+
+        button3 = QPushButton(text="3",parent=self)
+        button3.clicked.connect(self.button3click)
+
+        button4 = QPushButton(text="4",parent=self)
+        button4.clicked.connect(self.button4click)
 
         layout=QVBoxLayout()
-        layout.addWidget(QPushButton("1"))
-        layout.addWidget(QPushButton("2"))
-        layout.addWidget(QPushButton("3"))
-        layout.addWidget(QPushButton("4"))
+        layout.addWidget(button1)
+        layout.addWidget(button2)
+        layout.addWidget(button3)
+        layout.addWidget(button4)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-
-        button1 = QPushButton("1")
-        button1.clicked.connect(self.button1click)
-        button1.setFixedHeight(buttonheight)
-
-        button2 = QPushButton("2")
-        button2.clicked.connect(self.button2click)
-        button2.setFixedHeight(buttonheight)
-
-        button3 = QPushButton("3")
-        button3.clicked.connect(self.button3click)
-        button3.setFixedHeight(buttonheight)
-
-        button4 = QPushButton("4")
-        button4.clicked.connect(self.button4click)
-        button4.setFixedHeight(buttonheight)
-
-        
         widget = QWidget()
         widget.setLayout(layout)
+        button1.setFixedSize(buttonwidth,buttonheight)
+        button2.setFixedSize(buttonwidth,buttonheight)
+        button3.setFixedSize(buttonwidth,buttonheight)
+        button4.setFixedSize(buttonwidth,buttonheight)
         self.setCentralWidget(widget)
+        
 
     def button1click(self):
         #first button code
