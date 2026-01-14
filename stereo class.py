@@ -1,0 +1,215 @@
+import cv2
+import numpy as np
+
+class CameraCalibration:
+    def __init__(self, chessboard_size=(7,7), square_size=1.0):
+        """
+        Initialize calibration parameters.
+        """
+        self.chessboard_size = chessboard_size
+        self.square_size = square_size
+
+        # Prepare object points
+        self.objp = np.zeros((chessboard_size[1]*chessboard_size[0],3), np.float32)
+        self.objp[:,:2] = np.mgrid[0:chessboard_size[0],0:chessboard_size[1]].T.reshape(-1,2)
+        self.objp *= square_size #Gets matrix in terms of square size
+
+        # Lists of points
+        self.objpoints = []  # 3D points
+        self.imgpoints_left = []
+        self.imgpoints_right = []
+
+        # Camera matrices and distortion
+        self.ML = None
+        self.DL = None
+        self.MR = None
+        self.DR = None
+        self.ML_opt = None
+        self.MR_opt = None
+
+        # Stereo calibration outputs
+        self.R = None
+        self.T = None
+        self.E = None
+        self.F = None
+        self.RL = None
+        self.RR = None
+        self.PL = None
+        self.PR = None
+        self.Q = None
+
+        # Rectification maps
+        self.left_map1 = None
+        self.left_map2 = None
+        self.right_map1 = None
+        self.right_map2 = None
+
+    def add_chessboard_corners(self, img_left, img_right, display=False):
+        """
+        Detect and store chessboard corners in left and right images.
+        """
+
+        #CONVERT IMAGES INTO ARRAYS FROM WIRELESS TRANSMISSION
+        img_left_array = cv2.imread(img_left)
+        img_right_array = cv2.imread(img_right)
+
+        #Deal with no image read error
+        if img_left_array is None:
+            raise FileNotFoundError("Left image not loaded")
+        if img_right_array is None:
+            raise FileNotFoundError("Right image not loaded")
+
+        gray_left = cv2.cvtColor(img_left_array, cv2.COLOR_BGR2GRAY)
+        gray_right = cv2.cvtColor(img_right_array, cv2.COLOR_BGR2GRAY)
+
+        ret_left, corners_left = cv2.findChessboardCorners(gray_left, self.chessboard_size, None)
+        ret_right, corners_right = cv2.findChessboardCorners(gray_right, self.chessboard_size, None)
+
+        if ret_left and ret_right:
+            self.objpoints.append(self.objp)
+
+            # Subpixel refinement
+            criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+            corners_left = cv2.cornerSubPix(gray_left, corners_left, (11,11), (-1,-1), criteria)
+            corners_right = cv2.cornerSubPix(gray_right, corners_right, (11,11), (-1,-1), criteria)
+
+            self.imgpoints_left.append(corners_left)
+            self.imgpoints_right.append(corners_right)
+
+            if display:
+                cv2.drawChessboardCorners(img_left, self.chessboard_size, corners_left, ret_left)
+                cv2.drawChessboardCorners(img_right, self.chessboard_size, corners_right, ret_right)
+                cv2.imshow("Left Corners", img_left)
+                cv2.imshow("Right Corners", img_right)
+                cv2.waitKey(500)
+        else:
+            print("Chessboard not found in one or both images.")
+
+    def calibrate_cameras(self, image_shape, alpha=0.0):
+        """
+        Calibrate individual cameras and compute optimal new camera matrices.
+        alpha: free scaling parameter (0 = crop, 1 = keep all pixels)
+        """
+        # Left camera
+        rmsE1, self.ML, self.DL, rvecsL, tvecsL = cv2.calibrateCamera(
+            self.objpoints, self.imgpoints_left, image_shape, None, None
+        )
+        self.ML_opt, _ = cv2.getOptimalNewCameraMatrix(self.ML, self.DL, image_shape, alpha, image_shape)
+
+        # Right camera
+        rmsE2, self.MR, self.DR, rvecsR, tvecsR = cv2.calibrateCamera(
+            self.objpoints, self.imgpoints_right, image_shape, None, None
+        )
+        self.MR_opt, _ = cv2.getOptimalNewCameraMatrix(self.MR, self.DR, image_shape, alpha, image_shape)
+
+        return rmsE1cam, rmsE2cam, rvecsR, rvecsL, tvecsR, tvecsL
+
+    def stereo_calibrate_and_rectify(self, image_shape):
+        """
+        Stereo calibration: get R, T, E, F and rectification maps.
+        """
+        flags = cv2.CALIB_FIX_INTRINSIC #Fixes intrinsics determined from camera calibration 
+        criteria = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 100, 1e-5)
+
+        rmsReprojEstereo, _, _, _, _, self.R, self.T, self.E, self.F = cv2.stereoCalibrate(
+            self.objpoints,
+            self.imgpoints_left,
+            self.imgpoints_right,
+            self.ML_opt,
+            self.DL,
+            self.MR_opt,
+            self.DR,
+            image_shape,
+            criteria=criteria,
+            flags=flags
+        )
+
+        # Rectification
+        self.RL, self.RR, self.PL, self.PR, self.Q, _, _ = cv2.stereoRectify(
+            self.ML_opt, self.DL, self.MR_opt, self.DR, image_shape, self.R, self.T
+        )
+
+        # Precompute rectification maps
+        self.left_map1, self.left_map2 = cv2.initUndistortRectifyMap(
+            self.ML_opt, self.DL, self.RL, self.PL, image_shape, cv2.CV_16SC2
+        )
+        self.right_map1, self.right_map2 = cv2.initUndistortRectifyMap(
+            self.MR_opt, self.DR, self.RR, self.PR, image_shape, cv2.CV_16SC2
+        )
+
+        return rmsReprojEstereo, self.Q
+
+    def get_rectification_maps(self):
+        """
+        Return rectification maps for stereo rectification.
+        """
+        return self.left_map1, self.left_map2, self.right_map1, self.right_map2
+    
+#STEREO COMPUTATION CLASS
+class StereoSystem:
+    #Blocksize 7 (must be odd number between 3 and 11)
+    def __init__(self, min_disp=0, num_disp=128, block_size=7, lambda_val=8000, sigma_color=1.4):
+        self.min_disp = min_disp
+        self.num_disp = num_disp
+        self.block_size = block_size
+
+        self.matcher_left = cv2.StereoSGBM_create(
+            minDisparity=self.min_disp,
+            numDisparities=self.num_disp,
+            blockSize=self.block_size,
+            #Calculation per documentation in SGBM class
+            P1=8*3*self.block_size**2,
+            P2=32*3*self.block_size**2,
+            uniquenessRatio = 7,
+            speckleWindowSize = 125,
+            speckleRange = 1, 
+            #Consider MODE_SGBM for less memory consumption
+            mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY
+        )
+        self.matcher_right = cv2.ximgproc.createRightMatcher(self.matcher_left)
+
+        #LRCThresh default is 24 (1.5 px)
+        #Can use .getConfidenceMap() ***Still need to find a way to calculate LRC consistency check median value in px
+        #Lambda and SigmaColor values per documentation recommendation
+        self.wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=self.matcher_left)
+        self.wls_filter.setLambda(lambda_val)
+        self.wls_filter.setSigmaColor(sigma_color)
+
+        self.left_map1 = None
+        self.left_map2 = None
+        self.right_map1 = None
+        self.right_map2 = None
+        self.Q = None
+
+    def set_rectification(self, left_maps, right_maps, Q):
+        self.left_map1, self.left_map2 = left_maps
+        self.right_map1, self.right_map2 = right_maps
+        self.Q = Q
+
+    def rectify_pair(self, imgL, imgR):
+        imgL_rect = cv2.remap(imgL, self.left_map1, self.left_map2, cv2.INTER_LINEAR)
+        imgR_rect = cv2.remap(imgR, self.right_map1, self.right_map2, cv2.INTER_LINEAR)
+        return imgL_rect, imgR_rect
+
+    def compute_disparity(self, imgL, imgR):
+        dispL = self.matcher_left.compute(imgL, imgR).astype(np.float32) / 16.0
+
+        dispR = self.matcher_right.compute(imgR, imgL).astype(np.float32) / 16.0
+
+        dispL_filtered = self.wls_filter.filter(dispL, imgL, None, dispR)
+        return dispL_filtered, dispL, dispR
+
+    def disparity_to_depth(self, disparity):
+        if self.Q is None:
+            raise ValueError("Reprojection matrix Q not set.")
+        points_3D = cv2.reprojectImageTo3D(disparity, self.Q)
+        depth_map = points_3D[:,:,2]
+        return depth_map
+
+    def visualize_disparity(self, disparity):
+        disp_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
+        disp_vis = np.uint8(disp_vis)
+        cv2.imshow("Disparity", disp_vis)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
