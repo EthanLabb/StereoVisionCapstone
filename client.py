@@ -2,7 +2,7 @@ from image_transfer import ImageClient
 #import kevin's stereo openCV code
 
 class StereoClientDevice:
-    def __init__(self, server_host='192.168.1.100', server_port=8080):
+    def __init__(self, server_host='localhost', server_port=8080):
         self.client = ImageClient(server_host, server_port)
         #self.stereo_processor = StereoImageProcessor()
     
@@ -14,6 +14,8 @@ class StereoClientDevice:
         self.client.connect()
         while self.client.connected:
             imgL, imgR = self.client.receive_images()
+            imgL_array = imgL.get_array("main")
+            imgR_array = imgR.get_array("main") 
             #TODO process received images
         else:
             print("Client not connected to server, loading local images...")
